@@ -17,7 +17,15 @@ const submittedCards = ref([])
 const submitForm = () => {
   validateName(true)
   validatePassword(true)
-  if (!errors.value.username && !errors.value.password) {
+  validateConfirmPassword(true)
+  validateReason(true)
+
+  const hasActualErrors = errors.value.username ||
+                         errors.value.password ||
+                         errors.value.confirmPassword ||
+                         (errors.value.reason && errors.value.reason !== 'Great to have a friend')
+
+  if (!hasActualErrors) {
     submittedCards.value.push({ ...formData.value })
     clearForm()
   }
@@ -32,11 +40,13 @@ const clearForm = () => {
     reason: '',
     gender: ''
   }
+  errors.value.reason = null
 }
 
 const errors = ref({
   username: null,
   password: null,
+  confirmPassword: null,
   resident: null,
   gender: null,
   reason: null
@@ -70,6 +80,26 @@ const validatePassword = (blur) => {
     if (blur) errors.value.password = 'Password must contain at least one special character.'
   } else {
     errors.value.password = null
+  }
+}
+
+const validateConfirmPassword = (blur) => {
+  if (formData.value.password !== formData.value.confirmPassword) {
+    if (blur) errors.value.confirmPassword = 'Passwords do not match.'
+  } else {
+    errors.value.confirmPassword = null
+  }
+}
+
+const validateReason = (blur) => {
+  const reason = formData.value.reason.trim()
+
+  if (reason.length < 10) {
+    if (blur) errors.value.reason = 'Reason must be at least 10 characters'
+  } else if (reason.toLowerCase().includes('friend')) {
+    errors.value.reason = 'Great to have a friend'
+  } else {
+    errors.value.reason = null
   }
 }
 </script>
@@ -129,13 +159,17 @@ const validatePassword = (blur) => {
               </div>
             </div>
             <div class="col-md-6 col-sm-6">
-              <label for="confirmPassword" class="form-label">Confirm Password</label>
+              <label for="confirm-password" class="form-label">Confirm password</label>
               <input
                 type="password"
                 class="form-control"
-                id="confirmPassword"
+                id="confirm-password"
                 v-model="formData.confirmPassword"
+                @blur="() => validateConfirmPassword(true)"
               />
+              <div v-if="errors.confirmPassword" class="text-danger">
+                {{ errors.confirmPassword }}
+              </div>
             </div>
           </div>
           <div class="mb-3">
@@ -145,7 +179,11 @@ const validatePassword = (blur) => {
               id="reason"
               rows="3"
               v-model="formData.reason"
+              @blur="() => validateReason(true)"
+              @input="() => validateReason(false)"
             ></textarea>
+            <div v-if="errors.reason && errors.reason === 'Great to have a friend'" class="text-success">{{ errors.reason }}</div>
+            <div v-else-if="errors.reason" class="text-danger">{{ errors.reason }}</div>
           </div>
           <div class="text-center">
             <button type="submit" class="btn btn-primary me-2">Submit</button>
