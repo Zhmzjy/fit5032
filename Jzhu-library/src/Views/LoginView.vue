@@ -9,12 +9,12 @@
           <div class="card-body">
             <form @submit.prevent="handleLogin">
               <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
+                <label for="email" class="form-label">Email</label>
                 <input
-                  type="text"
+                  type="email"
                   class="form-control"
-                  id="username"
-                  v-model="username"
+                  id="email"
+                  v-model="email"
                   required
                 />
               </div>
@@ -31,8 +31,11 @@
               <div v-if="errorMessage" class="alert alert-danger">
                 {{ errorMessage }}
               </div>
+              <div v-if="loading" class="text-center">
+                <span>Logging in...</span>
+              </div>
               <div class="d-grid">
-                <button type="submit" class="btn btn-primary">Login</button>
+                <button type="submit" class="btn btn-primary" :disabled="loading">Login</button>
               </div>
             </form>
             <div class="mt-3 text-center">
@@ -51,24 +54,41 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import db from '../firebase/init'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 
 const router = useRouter()
-const { login, validateUser } = useAuth()
+const { login } = useAuth()
 
-const username = ref('')
+const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
+const loading = ref(false)
 
-const handleLogin = () => {
+const handleLogin = async () => {
   errorMessage.value = ''
+  loading.value = true
 
-  const user = validateUser(username.value, password.value)
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('email', '==', email.value),
+      where('password', '==', password.value)
+    )
 
-  if (user) {
-    login()
-    router.push('/')
-  } else {
-    errorMessage.value = 'Invalid username or password. Please register first if you do not have an account.'
+    const querySnapshot = await getDocs(q)
+
+    if (!querySnapshot.empty) {
+      login()
+      router.push('/')
+    } else {
+      errorMessage.value = 'Invalid email or password. Please check your credentials or register first.'
+    }
+  } catch (error) {
+    console.error('Login error:', error)
+    errorMessage.value = 'Login failed. Please try again.'
+  } finally {
+    loading.value = false
   }
 }
 </script>

@@ -3,11 +3,14 @@ import { ref } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import { useAuth } from '../composables/useAuth'
+import BookList from '../components/BookList.vue'
+import db from '../firebase/init'
+import { collection, addDoc } from 'firebase/firestore'
 
 const { addUser } = useAuth()
 
 const formData = ref({
-  username: '',
+  email: '',
   password: '',
   confirmPassword: '',
   isAustralian: false,
@@ -18,13 +21,13 @@ const formData = ref({
 
 const submittedCards = ref([])
 
-const submitForm = () => {
-  validateName(true)
+const submitForm = async () => {
+  validateEmail(true)
   validatePassword(true)
   validateConfirmPassword(true)
   validateReason(true)
 
-  const hasActualErrors = errors.value.username ||
+  const hasActualErrors = errors.value.email ||
                          errors.value.password ||
                          errors.value.confirmPassword ||
                          (errors.value.reason && errors.value.reason !== 'Great to have a friend')
@@ -33,13 +36,29 @@ const submitForm = () => {
     const userData = { ...formData.value }
     submittedCards.value.push(userData)
     addUser(userData)
+
+    try {
+      const docRef = await addDoc(collection(db, "users"), {
+        email: userData.email,
+        password: userData.password,
+        isAustralian: userData.isAustralian,
+        reason: userData.reason,
+        gender: userData.gender,
+        suburb: userData.suburb,
+        createdAt: new Date().toISOString()
+      })
+      console.log("User registered with ID:", docRef.id)
+    } catch (error) {
+      console.error("Error adding user to Firebase:", error)
+    }
+
     clearForm()
   }
 }
 
 const clearForm = () => {
   formData.value = {
-    username: '',
+    email: '',
     password: '',
     confirmPassword: '',
     isAustralian: false,
@@ -51,7 +70,7 @@ const clearForm = () => {
 }
 
 const errors = ref({
-  username: null,
+  email: null,
   password: null,
   confirmPassword: null,
   resident: null,
@@ -59,11 +78,14 @@ const errors = ref({
   reason: null
 })
 
-const validateName = (blur) => {
-  if (formData.value.username.length < 3) {
-    if (blur) errors.value.username = 'Name must be at least 3 characters'
+const validateEmail = (blur) => {
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!formData.value.email) {
+    if (blur) errors.value.email = 'Email is required'
+  } else if (!emailPattern.test(formData.value.email)) {
+    if (blur) errors.value.email = 'Please enter a valid email address'
   } else {
-    errors.value.username = null
+    errors.value.email = null
   }
 }
 
@@ -122,16 +144,16 @@ const validateReason = (blur) => {
         <form @submit.prevent="submitForm">
           <div class="row mb-3">
             <div class="col-md-6 col-sm-6">
-              <label for="username" class="form-label">Username</label>
+              <label for="email" class="form-label">Email</label>
               <input
-                type="text"
+                type="email"
                 class="form-control"
-                id="username"
-                @blur="() => validateName(true)"
-                @input="() => validateName(false)"
-                v-model="formData.username"
+                id="email"
+                @blur="() => validateEmail(true)"
+                @input="() => validateEmail(false)"
+                v-model="formData.email"
               />
-              <div v-if="errors.username" class="text-danger">{{ errors.username }}</div>
+              <div v-if="errors.email" class="text-danger">{{ errors.email }}</div>
             </div>
             <div class="col-md-6 col-sm-6">
               <label for="gender" class="form-label">Gender</label>
@@ -205,9 +227,14 @@ const validateReason = (blur) => {
   </div>
 
   <div class="row mt-5">
+  <!-- Add BookList component to display Firebase book data -->
+  <div class="container mt-5">
+    <BookList />
+  </div>
+
     <h4>This is a Primevue Datatable.</h4>
     <DataTable :value="submittedCards" tableStyle="min-width: 50rem">
-      <Column field="username" header="Username"></Column>
+      <Column field="email" header="Email"></Column>
       <Column field="password" header="Password"></Column>
       <Column field="isAustralian" header="Australian Resident"></Column>
       <Column field="gender" header="Gender"></Column>
@@ -226,7 +253,7 @@ const validateReason = (blur) => {
       >
         <div class="card-header">User Information</div>
         <ul class="list-group list-group-flush">
-          <li class="list-group-item">Username: {{ card.username }}</li>
+          <li class="list-group-item">Email: {{ card.email }}</li>
           <li class="list-group-item">Password: {{ card.password }}</li>
           <li class="list-group-item">
             Australian Resident: {{ card.isAustralian ? 'Yes' : 'No' }}
